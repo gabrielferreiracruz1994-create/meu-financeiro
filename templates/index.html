@@ -193,7 +193,6 @@
       loadBillsFromNuvem();
     });
 
-    // BUSCA OS DADOS DIRETO DA API DA NUVEM (SUPABASE)
     async function loadBillsFromNuvem() {
       try {
         const res = await fetch('/api/bills');
@@ -209,7 +208,6 @@
     function openModal() { document.getElementById('billModal').classList.remove('hidden'); }
     function closeModal() { document.getElementById('billModal').classList.add('hidden'); document.getElementById('billForm').reset(); }
 
-    // SALVA NA NUVEM VIA POST
     async function handleFormSubmit(e) {
       e.preventDefault();
 
@@ -222,7 +220,6 @@
       const launcherUser = document.getElementById('userSelector').value;
 
       const totalAmount = installmentVal * count;
-      const groupId = 'grp_' + Date.now();
 
       const [yearStr, monthStr, dayStr] = firstDueDateStr.split('-');
       let baseYear = parseInt(yearStr);
@@ -264,7 +261,6 @@
       loadBillsFromNuvem();
     }
 
-    // EXCLUIR DA NUVEM
     async function deleteBill(id) {
       if (confirm('Deseja excluir esta parcela permanentemente?')) {
         await fetch(`/api/bills/${id}`, { method: 'DELETE' });
