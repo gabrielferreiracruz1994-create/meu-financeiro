@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle Financeiro Pessoal & Empresarial</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
+
+  <!-- TOPBAR / HEADER -->
+  <header class="bg-slate-900 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-emerald-500 p-2 rounded-lg text-slate-900">
+          <i class="fa-solid font-bold text-xl fa-wallet"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold leading-none">Controle Financeiro</h1>
+          <span class="text-xs text-slate-400">Gerenciador de Contas, Parcelas e Despesas</span>
+        </div>
+      </div>
+
+      <!-- SELETOR DE QUEM ESTÁ LANÇANDO -->
+      <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-2 space-x-3">
+        <i class="fa-solid fa-user-gear text-emerald-400 text-lg"></i>
+        <div class="flex flex-col">
+          <label class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Usuário Atual (Lançador)</label>
+          <select id="userSelector" class="bg-transparent text-sm font-medium text-white focus:outline-none cursor-pointer">
+            <option value="Eu (Titular)" class="bg-slate-800">Eu (Titular)</option>
+            <option value="Esposa" class="bg-slate-800">Esposa</option>
+            <option value="Administrador" class="bg-slate-800">Administrador</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="max-w-7xl mx-auto px-4 mt-6">
+
+    <!-- FILTROS E AÇÕES SUPERIORES -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      
+      <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
+        <!-- SELETOR DE MÊS -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Mês de Referência</label>
+          <input type="month" id="monthFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <!-- FILTRO DE PERFIL -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Perfil / Titular</label>
+          <select id="profileFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="ALL">Todas as Contas</option>
+            <option value="Pessoal">Pessoal</option>
+            <option value="Esposa">Esposa</option>
+            <option value="Empresa">Empresa</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- BOTÃO NOVA DÍVIDA -->
+      <button onclick="openModal()" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-lg shadow-sm transition flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-plus"></i>
+        <span>Nova Dívida</span>
+      </button>
+
+    </div>
+
+    <!-- CARDS DE RESUMO FINANCEIRO DO MÊS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      
+      <!-- PENDENTE -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 border-gray-200 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">A Pagar no Mês (Pendente)</span>
+          <span id="totalPending" class="text-2xl font-black text-amber-600">R$ 0,00</span>
+        </div>
+        <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xl">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+      </div>
+
+      <!-- PAGO -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500 border-gray-200 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Pago no Mês</span>
+          <span id="totalPaid" class="text-2xl font-black text-emerald-600">R$ 0,00</span>
+        </div>
+        <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+
+      <!-- TOTAL MENSAL -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-slate-700 border-gray-200 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Total do Mês</span>
+          <span id="totalMonth" class="text-2xl font-black text-slate-800">R$ 0,00</span>
+        </div>
+        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 text-xl">
+          <i class="fa-solid fa-calculator"></i>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TABELA DE CONTA/PARCELAS -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="p-4 bg-slate-50 border-b border-gray-200 flex items-center justify-between">
+        <h2 class="font-bold text-slate-800 flex items-center space-x-2">
+          <i class="fa-solid fa-list-check text-emerald-600"></i>
+          <span>Dívidas / Parcelas do Mês</span>
+        </h2>
+        <span id="billsCount" class="text-xs bg-slate-200 text-slate-700 font-bold px-2.5 py-1 rounded-full">0 parcelas</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100/70 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+              <th class="p-3">Status</th>
+              <th class="p-3">Credor / Descrição</th>
+              <th class="p-3">Perfil</th>
+              <th class="p-3">Tipo / Parcela</th>
+              <th class="p-3">Vencimento</th>
+              <th class="p-3">Valor da Parcela</th>
+              <th class="p-3">Lançado por</th>
+              <th class="p-3 text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="billsTableBody" class="divide-y divide-gray-200 text-sm">
+            <!-- As linhas da tabela serão injetadas via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ESTADO VAZIO -->
+      <div id="emptyState" class="p-8 text-center hidden">
+        <div class="inline-flex p-4 rounded-full bg-slate-100 text-slate-400 mb-3">
+          <i class="fa-regular fa-folder-open text-3xl"></i>
+        </div>
+        <p class="text-gray-500 font-medium">Nenhuma dívida ou parcela encontrada para este mês.</p>
+        <p class="text-xs text-gray-400 mt-1">Alterne o mês acima ou adicione um novo lançamento.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE ADICIONAR DÍVIDA -->
+  <div id="billModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden transform transition-all">
+      
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg flex items-center space-x-2">
+          <i class="fa-solid fa-circle-plus text-emerald-400"></i>
+          <span>Nova Dívida / Compra</span>
+        </h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <form id="billForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+        
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Para quem deve? (Credor/Fornecedor)</label>
+          <input type="text" id="creditor" required placeholder="Ex: Cartão Nubank, Fornecedor X, Banco" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Perfil / Titular</label>
+            <select id="entity" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="Pessoal">Pessoal</option>
+              <option value="Esposa">Esposa</option>
+              <option value="Empresa">Empresa</option>
+            </select>
+          </div>
+
+          <div>
+            <label id="amountLabel" class="block text-xs font-bold text-gray-700 uppercase mb-1">Valor da Parcela (R$)</label>
+            <input type="number" step="0.01" min="0.01" id="installmentAmount" required placeholder="Ex: 353.00" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- RECORRENTE CHECKBOX -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center space-x-3">
+          <input type="checkbox" id="isRecurrent" onchange="toggleRecurrentMode()" class="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500">
+          <div>
+            <label for="isRecurrent" class="text-xs font-bold text-amber-900 cursor-pointer">Dívida Recorrente (Conta Fixa)</label>
+            <p class="text-[11px] text-amber-700">Marque para contas de todo mês (Luz, Água, Internet). Replicará este valor fixo pelos meses definidos.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label id="installmentsLabel" class="block text-xs font-bold text-gray-700 uppercase mb-1">Nº de Parcelas</label>
+            <input type="number" min="1" max="120" id="installmentsCount" value="1" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <span id="installmentsHelp" class="text-[11px] text-gray-400">Coloque 1 para pagamento à vista.</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">1º Vencimento</label>
+            <input type="date" id="firstDueDate" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-gray-200 flex justify-end space-x-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-50 transition">Cancelar</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-sm transition">Salvar Dívida</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO DA PARCELA -->
+  <div id="editModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden transform transition-all">
+      
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg flex items-center space-x-2">
+          <i class="fa-solid fa-pen-to-square text-blue-400"></i>
+          <span>Editar Parcela</span>
+        </h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <form id="editForm" onsubmit="handleEditSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editBillId">
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Credor / Descrição</label>
+          <input type="text" id="editCreditor" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Perfil / Titular</label>
+            <select id="editEntity" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Pessoal">Pessoal</option>
+              <option value="Esposa">Esposa</option>
+              <option value="Empresa">Empresa</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Valor da Parcela (R$)</label>
+            <input type="number" step="0.01" min="0.01" id="editAmount" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Data de Vencimento</label>
+            <input type="date" id="editDueDate" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Status do Pagamento</label>
+            <select id="editStatus" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="0">Pendente</option>
+              <option value="1">Pago</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-gray-200 flex justify-end space-x-3">
+          <button type="button" onclick="closeEditModal()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-50 transition">Cancelar</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition">Salvar Alterações</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT / LÓGICA DO SISTEMA -->
+  <script>
+    // ESTADO E BANCO LOCAL
+    let bills = JSON.parse(localStorage.getItem('cf_bills_v2')) || [];
+
+    // INICIALIZAÇÃO
+    document.addEventListener('DOMContentLoaded', () => {
+      const today = new Date();
+      const currentYearMonth = today.toISOString().slice(0, 7);
+      document.getElementById('monthFilter').value = currentYearMonth;
+      document.getElementById('firstDueDate').value = today.toISOString().slice(0, 10);
+
+      document.getElementById('monthFilter').addEventListener('change', render);
+      document.getElementById('profileFilter').addEventListener('change', render);
+
+      render();
+    });
+
+    // MUDANÇA DE MODO RECORRENTE
+    function toggleRecurrentMode() {
+      const isRecurrent = document.getElementById('isRecurrent').checked;
+      const installmentsLabel = document.getElementById('installmentsLabel');
+      const installmentsHelp = document.getElementById('installmentsHelp');
+      const amountLabel = document.getElementById('amountLabel');
+
+      if (isRecurrent) {
+        installmentsLabel.innerText = "Duração (Nº de Meses)";
+        installmentsHelp.innerText = "Quantidade de meses que essa conta fixa se repetirá.";
+        amountLabel.innerText = "Valor Mensal Fixo (R$)";
+      } else {
+        installmentsLabel.innerText = "Nº de Parcelas";
+        installmentsHelp.innerText = "Coloque 1 para pagamento à vista.";
+        amountLabel.innerText = "Valor da Parcela (R$)";
+      }
+    }
+
+    // SALVAR DADOS
+    function saveData() {
+      localStorage.setItem('cf_bills_v2', JSON.stringify(bills));
+    }
+
+    // MODAL
+    function openModal() {
+      document.getElementById('billModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('billModal').classList.add('hidden');
+      document.getElementById('billForm').reset();
+      document.getElementById('isRecurrent').checked = false;
+      toggleRecurrentMode();
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+
+    // ADICIONAR DÍVIDA
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const creditor = document.getElementById('creditor').value;
+      const entity = document.getElementById('entity').value;
+      const installmentVal = parseFloat(document.getElementById('installmentAmount').value);
+      const isRecurrent = document.getElementById('isRecurrent').checked;
+      const count = parseInt(document.getElementById('installmentsCount').value);
+      const firstDueDateStr = document.getElementById('firstDueDate').value;
+      const launcherUser = document.getElementById('userSelector').value;
+
+      const totalAmount = installmentVal * count;
+      const groupId = 'grp_' + Date.now();
+
+      const [yearStr, monthStr, dayStr] = firstDueDateStr.split('-');
+      let baseYear = parseInt(yearStr);
+      let baseMonth = parseInt(monthStr) - 1;
+      let baseDay = parseInt(dayStr);
+
+      for (let i = 1; i <= count; i++) {
+        let currentMonth = baseMonth + (i - 1);
+        let currentYear = baseYear + Math.floor(currentMonth / 12);
+        currentMonth = currentMonth % 12;
+
+        let maxDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        let actualDay = Math.min(baseDay, maxDaysInMonth);
+
+        let formattedMonth = String(currentMonth + 1).padStart(2, '0');
+        let formattedDay = String(actualDay).padStart(2, '0');
+        let dueDate = `${currentYear}-${formattedMonth}-${formattedDay}`;
+
+        const newBill = {
+          id: 'bill_' + Date.now() + '_' + i,
+          groupId: groupId,
+          creditor: creditor,
+          entity: entity,
+          totalAmount: totalAmount,
+          installmentNumber: i,
+          totalInstallments: count,
+          installmentAmount: installmentVal,
+          dueDate: dueDate,
+          isPaid: false,
+          isRecurrent: isRecurrent,
+          createdByUser: launcherUser
+        };
+
+        bills.push(newBill);
+      }
+
+      saveData();
+      closeModal();
+      render();
+    }
+
+    // ABRIR EDICÃO DE PARCELA
+    function openEditModal(billId) {
+      const bill = bills.find(b => b.id === billId);
+      if (!bill) return;
+
+      document.getElementById('editBillId').value = bill.id;
+      document.getElementById('editCreditor').value = bill.creditor;
+      document.getElementById('editEntity').value = bill.entity;
+      document.getElementById('editAmount').value = bill.installmentAmount;
+      document.getElementById('editDueDate').value = bill.dueDate;
+      document.getElementById('editStatus').value = bill.isPaid ? "1" : "0";
+
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    // SALVAR EDIÇÃO
+    function handleEditSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('editBillId').value;
+      const bill = bills.find(b => b.id === id);
+
+      if (bill) {
+        bill.creditor = document.getElementById('editCreditor').value;
+        bill.entity = document.getElementById('editEntity').value;
+        bill.installmentAmount = parseFloat(document.getElementById('editAmount').value);
+        bill.dueDate = document.getElementById('editDueDate').value;
+        bill.isPaid = document.getElementById('editStatus').value === "1";
+
+        saveData();
+        closeEditModal();
+        render();
+      }
+    }
+
+    // ALTERAR STATUS
+    function toggleBillStatus(id) {
+      const bill = bills.find(b => b.id === id);
+      if (bill) {
+        bill.isPaid = !bill.isPaid;
+        saveData();
+        render();
+      }
+    }
+
+    // REMOVER PARCELA
+    function deleteBill(id) {
+      if (confirm('Deseja realmente excluir este lançamento?')) {
+        bills = bills.filter(b => b.id !== id);
+        saveData();
+        render();
+      }
+    }
+
+    // FORMATAÇÃO DE MOEDA
+    function formatCurrency(val) {
+      return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // RENDERIZAÇÃO
+    function render() {
+      const selectedMonthYear = document.getElementById('monthFilter').value;
+      const selectedProfile = document.getElementById('profileFilter').value;
+
+      const monthlyBills = bills.filter(b => {
+        const matchesMonth = b.dueDate.startsWith(selectedMonthYear);
+        const matchesProfile = selectedProfile === 'ALL' || b.entity === selectedProfile;
+        return matchesMonth && matchesProfile;
+      });
+
+      monthlyBills.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+      let pendingTotal = 0;
+      let paidTotal = 0;
+
+      monthlyBills.forEach(b => {
+        if (b.isPaid) {
+          paidTotal += b.installmentAmount;
+        } else {
+          pendingTotal += b.installmentAmount;
+        }
+      });
+
+      const monthTotal = pendingTotal + paidTotal;
+
+      document.getElementById('totalPending').innerText = formatCurrency(pendingTotal);
+      document.getElementById('totalPaid').innerText = formatCurrency(paidTotal);
+      document.getElementById('totalMonth').innerText = formatCurrency(monthTotal);
+      document.getElementById('billsCount').innerText = `${monthlyBills.length} parcelas`;
+
+      const tbody = document.getElementById('billsTableBody');
+      const emptyState = document.getElementById('emptyState');
+
+      tbody.innerHTML = '';
+
+      if (monthlyBills.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+
+        monthlyBills.forEach(b => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-50 transition border-b border-gray-100';
+
+          const [year, month, day] = b.dueDate.split('-');
+          const formattedDate = `${day}/${month}/${year}`;
+
+          let profileColor = 'bg-blue-100 text-blue-800';
+          if (b.entity === 'Esposa') profileColor = 'bg-purple-100 text-purple-800';
+          if (b.entity === 'Empresa') profileColor = 'bg-amber-100 text-amber-800';
+
+          const typeBadge = b.isRecurrent 
+            ? `<span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded">Fixa (${b.installmentNumber}/${b.totalInstallments})</span>`
+            : `<span class="text-xs font-semibold text-gray-600">${b.installmentNumber}/${b.totalInstallments}</span>`;
+
+          tr.innerHTML = `
+            <td class="p-3">
+              ${b.isPaid 
+                ? '<span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><i class="fa-solid fa-check text-[10px]"></i><span>Pago</span></span>'
+                : '<span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700"><i class="fa-solid fa-clock text-[10px]"></i><span>Pendente</span></span>'
+              }
+            </td>
+            <td class="p-3 font-semibold text-slate-800">${b.creditor}</td>
+            <td class="p-3">
+              <span class="px-2.5 py-1 rounded-md text-xs font-bold ${profileColor}">${b.entity}</span>
+            </td>
+            <td class="p-3">${typeBadge}</td>
+            <td class="p-3 font-medium text-gray-600">${formattedDate}</td>
+            <td class="p-3 font-bold text-slate-800">${formatCurrency(b.installmentAmount)}</td>
+            <td class="p-3 text-xs text-gray-500"><i class="fa-regular fa-user mr-1"></i>${b.createdByUser || 'Desconhecido'}</td>
+            <td class="p-3 text-center space-x-1">
+              <button onclick="toggleBillStatus('${b.id}')" class="px-2.5 py-1 text-xs font-bold rounded-lg transition ${b.isPaid ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
+                ${b.isPaid ? 'Desfazer' : 'Pagar'}
+              </button>
+              <button onclick="openEditModal('${b.id}')" title="Editar Parcela" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteBill('${b.id}')" title="Excluir Parcela" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+      }
+    }
+  </script>
+</body>
+</html>
