@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
@@ -9,10 +8,10 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# Pega o link do banco do Supabase via variável de ambiente ou usa o link direto
-DATABASE_URL = os.getenv("DATABASE_URL", "COLE_AQUI_A_SUA_CONNECTION_STRING_DO_SUPABASE")
+# Pega o link do banco do Supabase via variável de ambiente
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
 
-# Correção caso o link comece com 'postgres://' (SQLAlchemy exige 'postgresql://')
+# Ajuste automático caso o link comece por 'postgres://'
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -20,7 +19,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# MODELO DO BANCO DE DADOS
+# MODELO DA TABELA NO SUPABASE
 class BillModel(Base):
     __tablename__ = "bills"
 
@@ -37,10 +36,12 @@ class BillModel(Base):
     is_recurrent = Column(Boolean, default=False)
     created_by_user = Column(String, nullable=False)
 
+# Cria as tabelas automaticamente no Supabase
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# CONEXÃO COM O BANCO DE DADOS
 def get_db():
     db = SessionLocal()
     try:
@@ -48,17 +49,7 @@ def get_db():
     finally:
         db.close()
 
-if os.path.exists("templates"):
-    app.mount("/static", StaticFiles(directory="templates"), name="static")
-
-@app.get("/")
-def read_root():
-    if os.path.exists("templates/index.html"):
-        return FileResponse("templates/index.html")
-    return {"message": "Servidor funcionando! A interface está em templates/index.html"}
-
-# ROTAS DA API PARA SALVAR E CONSULTAR DADOS PERMANENTES
-
+# MODELO PARA CRIAÇÃO DE DÍVIDAS
 class BillCreate(BaseModel):
     creditor: str
     entity: str
@@ -70,6 +61,7 @@ class BillCreate(BaseModel):
     is_recurrent: bool
     created_by_user: str
 
+# ROTAS DA API
 @app.get("/api/bills")
 def get_bills(db: Session = Depends(get_db)):
     bills = db.query(BillModel).all()
@@ -91,3 +83,13 @@ def delete_bill(bill_id: int, db: Session = Depends(get_db)):
         db.commit()
         return {"message": "Excluído com sucesso"}
     raise HTTPException(status_code=404, detail="Não encontrado")
+
+# SERVIR A INTERFACE WEB
+if os.path.exists("templates"):
+    app.mount("/static", StaticFiles(directory="templates"), name="static")
+
+@app.get("/")
+def read_root():
+    if os.path.exists("templates/index.html"):
+        return FileResponse("templates/index.html")
+    return {"message": "Servidor rodando! Envie a pasta templates/index.html"}
