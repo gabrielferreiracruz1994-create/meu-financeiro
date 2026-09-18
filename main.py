@@ -93,3 +93,10 @@ def read_root():
     if os.path.exists("templates/index.html"):
         return FileResponse("templates/index.html")
     return {"message": "Servidor rodando! Envie a pasta templates/index.html"}
+
+# Rota para servir o ícone e as configurações do App (PWA)
+@app.get("/manifest.json")
+def get_manifest():
+    if os.path.exists("manifest.json"):
+        return FileResponse("manifest.json")
+    raise HTTPException(status_code=404, detail="Manifest não encontrado")
