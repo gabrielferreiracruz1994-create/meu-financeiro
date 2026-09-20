@@ -17,6 +17,12 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+class ProfileModel(Base):
+    __tablename__ = "profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
 class CardModel(Base):
     __tablename__ = "cards"
 
@@ -55,6 +61,9 @@ def get_db():
     finally:
         db.close()
 
+class ProfileCreate(BaseModel):
+    name: str
+
 class CardCreate(BaseModel):
     name: str
     entity: str
@@ -90,6 +99,31 @@ class BillUpdate(BaseModel):
 class BillStatusUpdate(BaseModel):
     is_paid: bool
 
+# ROTAS DE PERFIS
+@app.get("/api/profiles")
+def get_profiles(db: Session = Depends(get_db)):
+    return db.query(ProfileModel).all()
+
+@app.post("/api/profiles")
+def create_profile(profile: ProfileCreate, db: Session = Depends(get_db)):
+    existing = db.query(ProfileModel).filter(ProfileModel.name == profile.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Perfil já existe")
+    db_profile = ProfileModel(name=profile.name)
+    db.add(db_profile)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+@app.delete("/api/profiles/{profile_id}")
+def delete_profile(profile_id: int, db: Session = Depends(get_db)):
+    profile = db.query(ProfileModel).filter(ProfileModel.id == profile_id).first()
+    if profile:
+        db.delete(profile)
+        db.commit()
+        return {"message": "Perfil excluído com sucesso"}
+    raise HTTPException(status_code=404, detail="Perfil não encontrado")
+
 # ROTAS DE CARTÕES
 @app.get("/api/cards")
 def get_cards(db: Session = Depends(get_db)):
@@ -121,7 +155,6 @@ def update_card(card_id: int, card_data: CardUpdate, db: Session = Depends(get_d
 def delete_card(card_id: int, db: Session = Depends(get_db)):
     card = db.query(CardModel).filter(CardModel.id == card_id).first()
     if card:
-        # Exclui primeiro os lançamentos vinculados a este cartão
         db.query(BillModel).filter(BillModel.card_id == card_id).delete()
         db.delete(card)
         db.commit()
