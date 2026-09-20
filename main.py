@@ -1,5 +1,5 @@
 import os
-from typing import Optional, List
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,7 +8,6 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# Pega a URL do Supabase via variável de ambiente no Render
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
 
 if DATABASE_URL.startswith("postgres://"):
@@ -18,7 +17,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# MODELO DE CARTÕES
 class CardModel(Base):
     __tablename__ = "cards"
 
@@ -29,7 +27,6 @@ class CardModel(Base):
     closing_day = Column(Integer, nullable=False)
     due_day = Column(Integer, nullable=False)
 
-# MODELO DE DÍVIDAS E PARCELAS
 class BillModel(Base):
     __tablename__ = "bills"
 
@@ -58,8 +55,14 @@ def get_db():
     finally:
         db.close()
 
-# SCHEMAS DE VALIDAÇÃO
 class CardCreate(BaseModel):
+    name: str
+    entity: str
+    total_limit: float
+    closing_day: int
+    due_day: int
+
+class CardUpdate(BaseModel):
     name: str
     entity: str
     total_limit: float
@@ -94,13 +97,27 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
     db.refresh(db_card)
     return db_card
 
+@app.put("/api/cards/{card_id}")
+def update_card(card_id: int, card_data: CardUpdate, db: Session = Depends(get_db)):
+    card = db.query(CardModel).filter(CardModel.id == card_id).first()
+    if card:
+        card.name = card_data.name
+        card.entity = card_data.entity
+        card.total_limit = card_data.total_limit
+        card.closing_day = card_data.closing_day
+        card.due_day = card_data.due_day
+        db.commit()
+        db.refresh(card)
+        return card
+    raise HTTPException(status_code=404, detail="Cartão não encontrado")
+
 @app.delete("/api/cards/{card_id}")
 def delete_card(card_id: int, db: Session = Depends(get_db)):
     card = db.query(CardModel).filter(CardModel.id == card_id).first()
     if card:
         db.delete(card)
         db.commit()
-        return {"message": "Cartão excluído"}
+        return {"message": "Cartão excluído com sucesso"}
     raise HTTPException(status_code=404, detail="Cartão não encontrado")
 
 # ROTAS DE DÍVIDAS
