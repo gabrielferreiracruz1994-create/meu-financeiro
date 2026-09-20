@@ -148,15 +148,17 @@
     </div>
   </main>
 
-  <!-- MODAL CADASTRO DE CARTÃO -->
+  <!-- MODAL CADASTRO / EDIÇÃO DE CARTÃO -->
   <div id="cardModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
       <div class="bg-indigo-900 text-white p-4 flex items-center justify-between">
-        <h3 class="font-bold text-lg">Novo Cartão de Crédito</h3>
+        <h3 id="cardModalTitle" class="font-bold text-lg">Novo Cartão de Crédito</h3>
         <button onclick="closeCardModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
       </div>
 
       <form id="cardForm" onsubmit="handleCardSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editCardId">
+
         <div>
           <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nome do Cartão</label>
           <input type="text" id="cardName" required placeholder="Ex: Inter, Nubank" class="w-full border rounded-lg p-2.5 text-sm">
@@ -288,8 +290,30 @@
       }
     }
 
-    function openCardModal() { document.getElementById('cardModal').classList.remove('hidden'); }
-    function closeCardModal() { document.getElementById('cardModal').classList.add('hidden'); document.getElementById('cardForm').reset(); }
+    function openCardModal(cardId = null) {
+      if (cardId) {
+        const card = cards.find(c => c.id === cardId);
+        if (card) {
+          document.getElementById('cardModalTitle').innerText = "Editar Cartão & Limite";
+          document.getElementById('editCardId').value = card.id;
+          document.getElementById('cardName').value = card.name;
+          document.getElementById('cardEntity').value = card.entity;
+          document.getElementById('cardLimit').value = card.total_limit;
+          document.getElementById('cardClosingDay').value = card.closing_day;
+          document.getElementById('cardDueDay').value = card.due_day;
+        }
+      } else {
+        document.getElementById('cardModalTitle').innerText = "Novo Cartão de Crédito";
+        document.getElementById('editCardId').value = "";
+        document.getElementById('cardForm').reset();
+      }
+      document.getElementById('cardModal').classList.remove('hidden');
+    }
+
+    function closeCardModal() {
+      document.getElementById('cardModal').classList.add('hidden');
+      document.getElementById('cardForm').reset();
+    }
 
     function openBillModal() { document.getElementById('billModal').classList.remove('hidden'); }
     function closeBillModal() { document.getElementById('billModal').classList.add('hidden'); document.getElementById('billForm').reset(); }
@@ -307,6 +331,8 @@
 
     async function handleCardSubmit(e) {
       e.preventDefault();
+      const editId = document.getElementById('editCardId').value;
+
       const payload = {
         name: document.getElementById('cardName').value,
         entity: document.getElementById('cardEntity').value,
@@ -315,11 +341,24 @@
         due_day: parseInt(document.getElementById('cardDueDay').value)
       };
 
-      await fetch('/api/cards', {
-        method: 'POST',
+      let url = '/api/cards';
+      let method = 'POST';
+
+      if (editId) {
+        url = `/api/cards/${editId}`;
+        method = 'PUT';
+      }
+
+      const res = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+
+      if (!res.ok) {
+        alert("Erro ao salvar cartão. Verifique os dados.");
+        return;
+      }
 
       closeCardModal();
       loadAllData();
@@ -337,7 +376,8 @@
 
       const creditor = document.getElementById('creditor').value;
       const entity = document.getElementById('entity').value;
-      const cardIdVal = document.getElementById('cardSelect').value;
+      const cardSelectVal = document.getElementById('cardSelect').value;
+      const cardId = cardSelectVal ? parseInt(cardSelectVal) : null;
       const installmentVal = parseFloat(document.getElementById('installmentAmount').value);
       const isRecurrent = document.getElementById('isRecurrent').checked;
       const count = parseInt(document.getElementById('installmentsCount').value);
@@ -366,7 +406,7 @@
         const payload = {
           creditor: creditor,
           entity: entity,
-          card_id: cardIdVal ? parseInt(cardIdVal) : null,
+          card_id: cardId,
           total_amount: totalAmount,
           installment_number: i,
           total_installments: count,
@@ -376,11 +416,16 @@
           created_by_user: launcherUser
         };
 
-        await fetch('/api/bills', {
+        const res = await fetch('/api/bills', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+
+        if (!res.ok) {
+          alert("Erro ao salvar lançamento. Tente novamente.");
+          return;
+        }
       }
 
       closeBillModal();
@@ -419,13 +464,13 @@
         cardsGrid.innerHTML = '<p class="text-xs text-gray-400 italic col-span-3">Nenhum cartão de crédito cadastrado.</p>';
       } else {
         cards.forEach(card => {
-          // Limite consumido = soma de TODAS as parcelas do cartão que AINDA NÃO FORAM PAGAS
+          // Limite consumido = soma das parcelas PENDENTES (não pagas)
           const pendingCardBills = bills.filter(b => b.card_id === card.id && !b.is_paid);
           const usedLimit = pendingCardBills.reduce((acc, b) => acc + b.installment_amount, 0);
           const availableLimit = card.total_limit - usedLimit;
           const usedPercent = Math.min(100, Math.round((usedLimit / card.total_limit) * 100));
 
-          // Fatura do Mês selecionado (Soma das compras naquele mês)
+          // Fatura do Mês selecionado
           const monthInvoice = bills
             .filter(b => b.card_id === card.id && b.due_date.startsWith(selectedMonthYear))
             .reduce((acc, b) => acc + b.installment_amount, 0);
@@ -436,7 +481,10 @@
             <div>
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Cartão ${card.name} (${card.entity})</span>
-                <button onclick="deleteCard(${card.id})" class="text-slate-500 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                <div class="flex items-center space-x-2">
+                  <button onclick="openCardModal(${card.id})" title="Editar limite e cartão" class="text-slate-400 hover:text-indigo-300 text-xs"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="deleteCard(${card.id})" title="Excluir cartão" class="text-slate-500 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                </div>
               </div>
               <div class="text-lg font-black">${formatCurrency(availableLimit)} <span class="text-[10px] font-normal text-slate-400">disponível de ${formatCurrency(card.total_limit)}</span></div>
               <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2 mb-3">
@@ -452,11 +500,9 @@
         });
       }
 
-      // 2. AGRUPAMENTO E CONSOLIDAÇÃO DA TABELA DE DÍVIDAS
-      // Dívidas normais (sem cartão)
+      // 2. AGRUPAMENTO DA TABELA DE DÍVIDAS
       const nonCardBills = bills.filter(b => !b.card_id && b.due_date.startsWith(selectedMonthYear) && (selectedProfile === 'ALL' || b.entity === selectedProfile));
 
-      // Dívidas de Cartão (Consolidadas como "Fatura [Nome do Cartão]")
       const cardBillsConsolidated = [];
       cards.forEach(card => {
         if (selectedProfile !== 'ALL' && card.entity !== selectedProfile) return;
@@ -512,7 +558,6 @@
           
           let payButtonAction = '';
           if (b.is_card_invoice) {
-            // Paga ou desfaz todas as parcelas da fatura juntas
             payButtonAction = `
               <button onclick="toggleCardInvoiceStatus(${b.card_id}, '${selectedMonthYear}', ${b.is_paid})" class="px-2.5 py-1 text-xs font-bold rounded transition ${b.is_paid ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
                 ${b.is_paid ? 'Desfazer' : 'Pagar Fatura'}
