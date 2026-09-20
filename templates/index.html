@@ -31,15 +31,18 @@
         </div>
       </div>
 
-      <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-2 space-x-3">
-        <i class="fa-solid fa-user-gear text-emerald-400 text-lg"></i>
-        <div class="flex flex-col">
-          <label class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Usuário Atual (Lançador)</label>
-          <select id="userSelector" class="bg-transparent text-sm font-medium text-white focus:outline-none cursor-pointer">
-            <option value="Gabriel" class="bg-slate-800">Gabriel</option>
-            <option value="Jéssica" class="bg-slate-800">Jéssica</option>
-            <option value="Empresas" class="bg-slate-800">Empresas</option>
-          </select>
+      <div class="flex items-center space-x-4">
+        <button onclick="openProfilesModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold py-2 px-3 rounded-lg text-slate-200 flex items-center space-x-2 transition">
+          <i class="fa-solid fa-users-gear text-emerald-400 text-sm"></i>
+          <span>Gerenciar Perfis / Pessoas</span>
+        </button>
+
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-2 space-x-3">
+          <i class="fa-solid fa-user text-emerald-400 text-base"></i>
+          <div class="flex flex-col">
+            <label class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Lançador Atual</label>
+            <select id="userSelector" class="bg-transparent text-sm font-medium text-white focus:outline-none cursor-pointer"></select>
+          </div>
         </div>
       </div>
     </div>
@@ -74,12 +77,7 @@
 
         <div>
           <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Perfil / Titular</label>
-          <select id="profileFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-            <option value="ALL">Todas as Contas</option>
-            <option value="Gabriel">Gabriel</option>
-            <option value="Jéssica">Jéssica</option>
-            <option value="Empresas">Empresas</option>
-          </select>
+          <select id="profileFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"></select>
         </div>
       </div>
 
@@ -148,6 +146,29 @@
     </div>
   </main>
 
+  <!-- MODAL GERENCIAR PERFIS / PESSOAS -->
+  <div id="profilesModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Gerenciar Perfis / Pessoas</h3>
+        <button onclick="closeProfilesModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <form onsubmit="handleCreateProfile(event)" class="flex gap-2">
+          <input type="text" id="newProfileName" required placeholder="Novo Nome (Ex: Marido, Esposa)" class="flex-1 border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm transition">Adicionar</button>
+        </form>
+
+        <div class="border rounded-lg divide-y max-h-52 overflow-y-auto" id="profilesListContainer"></div>
+
+        <div class="pt-2 flex justify-end">
+          <button type="button" onclick="closeProfilesModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL CADASTRO / EDIÇÃO DE CARTÃO -->
   <div id="cardModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
@@ -167,15 +188,11 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Perfil / Titular</label>
-            <select id="cardEntity" required class="w-full border rounded-lg p-2.5 text-sm">
-              <option value="Gabriel">Gabriel</option>
-              <option value="Jéssica">Jéssica</option>
-              <option value="Empresas">Empresas</option>
-            </select>
+            <select id="cardEntity" required class="w-full border rounded-lg p-2.5 text-sm"></select>
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Limite Total (R$)</label>
-            <input type="number" step="0.01" min="1" id="cardLimit" required placeholder="1313.98" class="w-full border rounded-lg p-2.5 text-sm">
+            <input type="number" step="0.01" min="1" id="cardLimit" required placeholder="1500.00" class="w-full border rounded-lg p-2.5 text-sm">
           </div>
         </div>
 
@@ -198,7 +215,7 @@
     </div>
   </div>
 
-  <!-- MODAL DETALHES / ITENS DA FATURA DO CARTÃO -->
+  <!-- MODAL DETALHES DA FATURA -->
   <div id="invoiceDetailsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-xl shadow-xl max-w-xl w-full overflow-hidden">
       <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
@@ -207,7 +224,7 @@
       </div>
 
       <div class="p-6">
-        <p class="text-xs text-gray-500 mb-4">Abaixo estão os lançamentos individuais desta fatura. Você pode excluir itens específicos se desejar.</p>
+        <p class="text-xs text-gray-500 mb-4">Lançamentos individuais desta fatura. Você pode excluir itens específicos se desejar.</p>
         
         <div class="overflow-y-auto max-h-60 border rounded-lg divide-y">
           <table class="w-full text-left border-collapse">
@@ -252,11 +269,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Perfil / Titular</label>
-            <select id="entity" required class="w-full border rounded-lg p-2.5 text-sm">
-              <option value="Gabriel">Gabriel</option>
-              <option value="Jéssica">Jéssica</option>
-              <option value="Empresas">Empresas</option>
-            </select>
+            <select id="entity" required class="w-full border rounded-lg p-2.5 text-sm"></select>
           </div>
           <div id="cardSelectContainer">
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Forma / Cartão de Crédito</label>
@@ -298,6 +311,7 @@
   <script>
     let bills = [];
     let cards = [];
+    let profiles = [];
     let currentInvoiceItems = [];
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -313,18 +327,109 @@
 
     async function loadAllData() {
       try {
-        const [resBills, resCards] = await Promise.all([
+        const [resBills, resCards, resProfiles] = await Promise.all([
           fetch('/api/bills'),
-          fetch('/api/cards')
+          fetch('/api/cards'),
+          fetch('/api/profiles')
         ]);
 
         if (resBills.ok) bills = await resBills.json();
         if (resCards.ok) cards = await resCards.json();
+        if (resProfiles.ok) profiles = await resProfiles.json();
 
+        updateProfileSelectOptions();
         updateCardSelectOptions();
         render();
       } catch (err) {
         console.error("Erro ao carregar dados:", err);
+      }
+    }
+
+    function updateProfileSelectOptions() {
+      const userSel = document.getElementById('userSelector');
+      const filterSel = document.getElementById('profileFilter');
+      const cardEntSel = document.getElementById('cardEntity');
+      const billEntSel = document.getElementById('entity');
+
+      const savedUser = userSel.value;
+      const savedFilter = filterSel.value;
+
+      userSel.innerHTML = '';
+      filterSel.innerHTML = '<option value="ALL">Todas as Contas</option>';
+      cardEntSel.innerHTML = '';
+      billEntSel.innerHTML = '';
+
+      profiles.forEach(p => {
+        userSel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        filterSel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        cardEntSel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        billEntSel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+      });
+
+      if (savedUser && profiles.some(p => p.name === savedUser)) userSel.value = savedUser;
+      if (savedFilter && (savedFilter === 'ALL' || profiles.some(p => p.name === savedFilter))) filterSel.value = savedFilter;
+    }
+
+    function openProfilesModal() {
+      renderProfilesList();
+      document.getElementById('profilesModal').classList.remove('hidden');
+    }
+
+    function closeProfilesModal() {
+      document.getElementById('profilesModal').classList.add('hidden');
+    }
+
+    function renderProfilesList() {
+      const container = document.getElementById('profilesListContainer');
+      container.innerHTML = '';
+
+      if (profiles.length === 0) {
+        container.innerHTML = '<p class="p-3 text-xs text-gray-400 italic">Nenhum perfil cadastrado.</p>';
+        return;
+      }
+
+      profiles.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-3 bg-gray-50 text-sm';
+        div.innerHTML = `
+          <span class="font-bold text-gray-700">${p.name}</span>
+          <button onclick="deleteProfile(${p.id})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2 py-1 rounded bg-rose-50 hover:bg-rose-100">
+            <i class="fa-solid fa-trash-can mr-1"></i> Excluir
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function handleCreateProfile(e) {
+      e.preventDefault();
+      const input = document.getElementById('newProfileName');
+      const name = input.value.trim();
+
+      if (!name) return;
+
+      const res = await fetch('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+
+      if (res.ok) {
+        input.value = '';
+        await loadAllData();
+        renderProfilesList();
+      } else {
+        alert("Erro ou perfil já cadastrado.");
+      }
+    }
+
+    async function deleteProfile(id) {
+      if (confirm('Excluir este perfil? Os lançamentos associados a ele continuarão no sistema.')) {
+        const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          await loadAllData();
+          renderProfilesList();
+        }
       }
     }
 
@@ -521,7 +626,7 @@
       const cardId = cardSelectVal ? parseInt(cardSelectVal) : null;
       const isRecurrent = document.getElementById('isRecurrent').checked;
       const count = parseInt(document.getElementById('installmentsCount').value);
-      const launcherUser = document.getElementById('userSelector').value;
+      const launcherUser = document.getElementById('userSelector').value || 'Padrão';
 
       const totalAmount = installmentVal * count;
 
