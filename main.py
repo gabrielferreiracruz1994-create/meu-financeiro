@@ -42,7 +42,7 @@ class BillModel(Base):
     is_paid = Column(Boolean, default=False)
     is_recurrent = Column(Boolean, default=False)
     created_by_user = Column(String, nullable=False)
-    card_id = Column(Integer, ForeignKey("cards.id"), nullable=True)
+    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -81,6 +81,12 @@ class BillCreate(BaseModel):
     created_by_user: str
     card_id: Optional[int] = None
 
+class BillUpdate(BaseModel):
+    creditor: str
+    entity: str
+    installment_amount: float
+    due_date: str
+
 class BillStatusUpdate(BaseModel):
     is_paid: bool
 
@@ -115,9 +121,11 @@ def update_card(card_id: int, card_data: CardUpdate, db: Session = Depends(get_d
 def delete_card(card_id: int, db: Session = Depends(get_db)):
     card = db.query(CardModel).filter(CardModel.id == card_id).first()
     if card:
+        # Exclui primeiro os lançamentos vinculados a este cartão
+        db.query(BillModel).filter(BillModel.card_id == card_id).delete()
         db.delete(card)
         db.commit()
-        return {"message": "Cartão excluído com sucesso"}
+        return {"message": "Cartão e lançamentos associados excluídos com sucesso"}
     raise HTTPException(status_code=404, detail="Cartão não encontrado")
 
 # ROTAS DE DÍVIDAS
@@ -132,6 +140,18 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_bill)
     return db_bill
+
+@app.put("/api/bills/{bill_id}")
+def update_bill(bill_id: int, bill_data: BillUpdate, db: Session = Depends(get_db)):
+    bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
+    if bill:
+        bill.creditor = bill_data.creditor
+        bill.entity = bill_data.entity
+        bill.installment_amount = bill_data.installment_amount
+        bill.due_date = bill_data.due_date
+        db.commit()
+        return {"message": "Lançamento atualizado"}
+    raise HTTPException(status_code=404, detail="Dívida não encontrada")
 
 @app.put("/api/bills/{bill_id}/status")
 def update_bill_status(bill_id: int, status_data: BillStatusUpdate, db: Session = Depends(get_db)):
