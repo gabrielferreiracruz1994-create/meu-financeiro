@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
+# Pega a URL do Supabase via variável de ambiente no Render
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
 
 if DATABASE_URL.startswith("postgres://"):
@@ -17,16 +18,18 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# MODELO DE CARTÕES
 class CardModel(Base):
     __tablename__ = "cards"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)            # Ex: Inter, Nubank
-    entity = Column(String, nullable=False)          # Gabriel, Jéssica, Empresas
-    total_limit = Column(Float, nullable=False)      # Limite Total
-    closing_day = Column(Integer, nullable=False)    # Dia de fechamento
-    due_day = Column(Integer, nullable=False)        # Dia de vencimento
+    name = Column(String, nullable=False)
+    entity = Column(String, nullable=False)
+    total_limit = Column(Float, nullable=False)
+    closing_day = Column(Integer, nullable=False)
+    due_day = Column(Integer, nullable=False)
 
+# MODELO DE DÍVIDAS E PARCELAS
 class BillModel(Base):
     __tablename__ = "bills"
 
@@ -55,6 +58,7 @@ def get_db():
     finally:
         db.close()
 
+# SCHEMAS DE VALIDAÇÃO
 class CardCreate(BaseModel):
     name: str
     entity: str
@@ -74,10 +78,10 @@ class BillCreate(BaseModel):
     created_by_user: str
     card_id: Optional[int] = None
 
-class BillUpdateStatus(BaseModel):
+class BillStatusUpdate(BaseModel):
     is_paid: bool
 
-# ROTAS CARTÕES
+# ROTAS DE CARTÕES
 @app.get("/api/cards")
 def get_cards(db: Session = Depends(get_db)):
     return db.query(CardModel).all()
@@ -96,10 +100,10 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
     if card:
         db.delete(card)
         db.commit()
-        return {"message": "Cartão excluído com sucesso"}
+        return {"message": "Cartão excluído"}
     raise HTTPException(status_code=404, detail="Cartão não encontrado")
 
-# ROTAS DÍVIDAS
+# ROTAS DE DÍVIDAS
 @app.get("/api/bills")
 def get_bills(db: Session = Depends(get_db)):
     return db.query(BillModel).all()
@@ -113,7 +117,7 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
     return db_bill
 
 @app.put("/api/bills/{bill_id}/status")
-def update_bill_status(bill_id: int, status_data: BillUpdateStatus, db: Session = Depends(get_db)):
+def update_bill_status(bill_id: int, status_data: BillStatusUpdate, db: Session = Depends(get_db)):
     bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
     if bill:
         bill.is_paid = status_data.is_paid
