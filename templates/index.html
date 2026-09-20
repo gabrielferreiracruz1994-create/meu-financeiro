@@ -198,15 +198,52 @@
     </div>
   </div>
 
-  <!-- MODAL CADASTRO DÍVIDA -->
+  <!-- MODAL DETALHES / ITENS DA FATURA DO CARTÃO -->
+  <div id="invoiceDetailsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-xl w-full overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 id="invoiceModalTitle" class="font-bold text-lg">Compras da Fatura</h3>
+        <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="p-6">
+        <p class="text-xs text-gray-500 mb-4">Abaixo estão os lançamentos individuais desta fatura. Você pode excluir itens específicos se desejar.</p>
+        
+        <div class="overflow-y-auto max-h-60 border rounded-lg divide-y">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 text-[11px] font-bold text-gray-500 uppercase">
+              <tr>
+                <th class="p-2.5">Descrição</th>
+                <th class="p-2.5">Parcela</th>
+                <th class="p-2.5">Valor</th>
+                <th class="p-2.5 text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceItemsTableBody" class="text-xs divide-y"></tbody>
+          </table>
+        </div>
+
+        <div class="pt-5 border-t mt-4 flex items-center justify-between">
+          <button onclick="deleteEntireInvoice()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition">
+            <i class="fa-solid fa-trash-can mr-1"></i> Excluir Toda a Fatura do Mês
+          </button>
+          <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border rounded-lg text-xs font-semibold">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CADASTRO / EDIÇÃO DÍVIDA -->
   <div id="billModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden">
       <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
-        <h3 class="font-bold text-lg">Nova Dívida / Compra</h3>
+        <h3 id="billModalTitle" class="font-bold text-lg">Nova Dívida / Compra</h3>
         <button onclick="closeBillModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
       </div>
 
       <form id="billForm" onsubmit="handleBillSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editBillId">
+
         <div>
           <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Credor / Descrição da Compra</label>
           <input type="text" id="creditor" required placeholder="Ex: Mercado, Luz, Magazine Luiza" class="w-full border rounded-lg p-2.5 text-sm">
@@ -221,7 +258,7 @@
               <option value="Empresas">Empresas</option>
             </select>
           </div>
-          <div>
+          <div id="cardSelectContainer">
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Forma / Cartão de Crédito</label>
             <select id="cardSelect" class="w-full border rounded-lg p-2.5 text-sm">
               <option value="">Nenhum (Boleto / Pix / Dinheiro)</option>
@@ -234,19 +271,19 @@
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Valor da Parcela (R$)</label>
             <input type="number" step="0.01" min="0.01" id="installmentAmount" required placeholder="14.00" class="w-full border rounded-lg p-2.5 text-sm">
           </div>
-          <div>
+          <div id="installmentsCountContainer">
             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nº de Parcelas</label>
             <input type="number" min="1" max="120" id="installmentsCount" value="1" required class="w-full border rounded-lg p-2.5 text-sm">
           </div>
         </div>
 
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center space-x-3">
+        <div id="recurrentContainer" class="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center space-x-3">
           <input type="checkbox" id="isRecurrent" class="w-4 h-4 text-emerald-600 rounded">
           <label for="isRecurrent" class="text-xs font-bold text-amber-900 cursor-pointer">Dívida Recorrente (Conta Fixa Ex: Luz, Água)</label>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">1º Vencimento</label>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Vencimento / 1º Vencimento</label>
           <input type="date" id="firstDueDate" required class="w-full border rounded-lg p-2.5 text-sm">
         </div>
 
@@ -261,6 +298,7 @@
   <script>
     let bills = [];
     let cards = [];
+    let currentInvoiceItems = [];
 
     document.addEventListener('DOMContentLoaded', () => {
       const today = new Date();
@@ -315,8 +353,84 @@
       document.getElementById('cardForm').reset();
     }
 
-    function openBillModal() { document.getElementById('billModal').classList.remove('hidden'); }
-    function closeBillModal() { document.getElementById('billModal').classList.add('hidden'); document.getElementById('billForm').reset(); }
+    function openBillModal(billId = null) {
+      if (billId) {
+        const bill = bills.find(b => b.id === billId);
+        if (bill) {
+          document.getElementById('billModalTitle').innerText = "Editar Dívida / Compra";
+          document.getElementById('editBillId').value = bill.id;
+          document.getElementById('creditor').value = bill.creditor;
+          document.getElementById('entity').value = bill.entity;
+          document.getElementById('installmentAmount').value = bill.installment_amount;
+          document.getElementById('firstDueDate').value = bill.due_date;
+          
+          document.getElementById('cardSelectContainer').classList.add('hidden');
+          document.getElementById('installmentsCountContainer').classList.add('hidden');
+          document.getElementById('recurrentContainer').classList.add('hidden');
+        }
+      } else {
+        document.getElementById('billModalTitle').innerText = "Nova Dívida / Compra";
+        document.getElementById('editBillId').value = "";
+        document.getElementById('billForm').reset();
+        
+        document.getElementById('cardSelectContainer').classList.remove('hidden');
+        document.getElementById('installmentsCountContainer').classList.remove('hidden');
+        document.getElementById('recurrentContainer').classList.remove('hidden');
+      }
+      document.getElementById('billModal').classList.remove('hidden');
+    }
+
+    function closeBillModal() {
+      document.getElementById('billModal').classList.add('hidden');
+      document.getElementById('billForm').reset();
+    }
+
+    function openInvoiceModal(cardId, monthYear) {
+      const card = cards.find(c => c.id === cardId);
+      currentInvoiceItems = bills.filter(b => b.card_id === cardId && b.due_date.startsWith(monthYear));
+      
+      document.getElementById('invoiceModalTitle').innerText = `Compras: Cartão ${card ? card.name : ''} (${monthYear.split('-')[1]}/${monthYear.split('-')[0]})`;
+      
+      const tbody = document.getElementById('invoiceItemsTableBody');
+      tbody.innerHTML = '';
+
+      currentInvoiceItems.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2.5 font-semibold">${item.creditor}</td>
+          <td class="p-2.5">${item.installment_number}/${item.total_installments}</td>
+          <td class="p-2.5 font-bold">${formatCurrency(item.installment_amount)}</td>
+          <td class="p-2.5 text-center">
+            <button onclick="deleteSingleInvoiceItem(${item.id})" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('invoiceDetailsModal').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoiceDetailsModal').classList.add('hidden');
+    }
+
+    async function deleteSingleInvoiceItem(id) {
+      if (confirm('Excluir este item da fatura?')) {
+        await fetch(`/api/bills/${id}`, { method: 'DELETE' });
+        closeInvoiceModal();
+        loadAllData();
+      }
+    }
+
+    async function deleteEntireInvoice() {
+      if (confirm('Excluir TODAS as compras desta fatura do mês?')) {
+        for (let item of currentInvoiceItems) {
+          await fetch(`/api/bills/${item.id}`, { method: 'DELETE' });
+        }
+        closeInvoiceModal();
+        loadAllData();
+      }
+    }
 
     function updateCardSelectOptions() {
       const select = document.getElementById('cardSelect');
@@ -356,7 +470,7 @@
       });
 
       if (!res.ok) {
-        alert("Erro ao salvar cartão. Verifique os dados.");
+        alert("Erro ao salvar cartão.");
         return;
       }
 
@@ -365,28 +479,53 @@
     }
 
     async function deleteCard(id) {
-      if (confirm('Excluir este cartão de crédito?')) {
-        await fetch(`/api/cards/${id}`, { method: 'DELETE' });
-        loadAllData();
+      if (confirm('Excluir este cartão de crédito? Isso removerá também os lançamentos dele.')) {
+        const res = await fetch(`/api/cards/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadAllData();
+        } else {
+          alert("Erro ao excluir cartão.");
+        }
       }
     }
 
     async function handleBillSubmit(e) {
       e.preventDefault();
+      const editId = document.getElementById('editBillId').value;
 
       const creditor = document.getElementById('creditor').value;
       const entity = document.getElementById('entity').value;
+      const installmentVal = parseFloat(document.getElementById('installmentAmount').value);
+      const dueDateVal = document.getElementById('firstDueDate').value;
+
+      if (editId) {
+        const payload = {
+          creditor: creditor,
+          entity: entity,
+          installment_amount: installmentVal,
+          due_date: dueDateVal
+        };
+
+        await fetch(`/api/bills/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        closeBillModal();
+        loadAllData();
+        return;
+      }
+
       const cardSelectVal = document.getElementById('cardSelect').value;
       const cardId = cardSelectVal ? parseInt(cardSelectVal) : null;
-      const installmentVal = parseFloat(document.getElementById('installmentAmount').value);
       const isRecurrent = document.getElementById('isRecurrent').checked;
       const count = parseInt(document.getElementById('installmentsCount').value);
-      const firstDueDateStr = document.getElementById('firstDueDate').value;
       const launcherUser = document.getElementById('userSelector').value;
 
       const totalAmount = installmentVal * count;
 
-      const [yearStr, monthStr, dayStr] = firstDueDateStr.split('-');
+      const [yearStr, monthStr, dayStr] = dueDateVal.split('-');
       let baseYear = parseInt(yearStr);
       let baseMonth = parseInt(monthStr) - 1;
       let baseDay = parseInt(dayStr);
@@ -423,7 +562,7 @@
         });
 
         if (!res.ok) {
-          alert("Erro ao salvar lançamento. Tente novamente.");
+          alert("Erro ao salvar lançamento.");
           return;
         }
       }
@@ -442,7 +581,7 @@
     }
 
     async function deleteBill(id) {
-      if (confirm('Deseja excluir esta parcela/fatura permanentemente?')) {
+      if (confirm('Deseja excluir esta conta permanentemente?')) {
         await fetch(`/api/bills/${id}`, { method: 'DELETE' });
         loadAllData();
       }
@@ -456,7 +595,7 @@
       const selectedMonthYear = document.getElementById('monthFilter').value;
       const selectedProfile = document.getElementById('profileFilter').value;
 
-      // 1. CARDS DOS CARTÕES E CONSUMO DE LIMITE
+      // 1. CARDS DOS CARTÕES
       const cardsGrid = document.getElementById('cardsGrid');
       cardsGrid.innerHTML = '';
 
@@ -464,13 +603,11 @@
         cardsGrid.innerHTML = '<p class="text-xs text-gray-400 italic col-span-3">Nenhum cartão de crédito cadastrado.</p>';
       } else {
         cards.forEach(card => {
-          // Limite consumido = soma das parcelas PENDENTES (não pagas)
           const pendingCardBills = bills.filter(b => b.card_id === card.id && !b.is_paid);
           const usedLimit = pendingCardBills.reduce((acc, b) => acc + b.installment_amount, 0);
           const availableLimit = card.total_limit - usedLimit;
           const usedPercent = Math.min(100, Math.round((usedLimit / card.total_limit) * 100));
 
-          // Fatura do Mês selecionado
           const monthInvoice = bills
             .filter(b => b.card_id === card.id && b.due_date.startsWith(selectedMonthYear))
             .reduce((acc, b) => acc + b.installment_amount, 0);
@@ -500,7 +637,7 @@
         });
       }
 
-      // 2. AGRUPAMENTO DA TABELA DE DÍVIDAS
+      // 2. TABELA
       const nonCardBills = bills.filter(b => !b.card_id && b.due_date.startsWith(selectedMonthYear) && (selectedProfile === 'ALL' || b.entity === selectedProfile));
 
       const cardBillsConsolidated = [];
@@ -557,17 +694,41 @@
           const [y, m, d] = b.due_date.split('-');
           
           let payButtonAction = '';
+          let creditorContent = '';
+          let actionsContent = '';
+
           if (b.is_card_invoice) {
+            creditorContent = `
+              <div class="flex items-center space-x-2">
+                <span class="text-indigo-700 font-bold">${b.creditor}</span>
+                <button onclick="openInvoiceModal(${b.card_id}, '${selectedMonthYear}')" title="Ver/Excluir Compras Desta Fatura" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 font-semibold">
+                  <i class="fa-solid fa-list mr-1"></i> Detalhes (${b.items.length})
+                </button>
+              </div>
+            `;
+
             payButtonAction = `
               <button onclick="toggleCardInvoiceStatus(${b.card_id}, '${selectedMonthYear}', ${b.is_paid})" class="px-2.5 py-1 text-xs font-bold rounded transition ${b.is_paid ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
                 ${b.is_paid ? 'Desfazer' : 'Pagar Fatura'}
               </button>
             `;
+
+            actionsContent = payButtonAction;
           } else {
+            creditorContent = `<span class="font-semibold">${b.creditor}</span>`;
+
             payButtonAction = `
               <button onclick="toggleBillStatus(${b.id}, ${b.is_paid})" class="px-2.5 py-1 text-xs font-bold rounded transition ${b.is_paid ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
                 ${b.is_paid ? 'Desfazer' : 'Pagar'}
               </button>
+            `;
+
+            actionsContent = `
+              <div class="flex items-center justify-center space-x-2">
+                ${payButtonAction}
+                <button onclick="openBillModal(${b.id})" class="p-1.5 text-slate-500 hover:bg-slate-100 rounded" title="Editar Dívida"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button onclick="deleteBill(${b.id})" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded" title="Excluir Dívida"><i class="fa-solid fa-trash-can"></i></button>
+              </div>
             `;
           }
 
@@ -578,14 +739,11 @@
                 : '<span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">Pendente</span>'
               }
             </td>
-            <td class="p-3 font-semibold ${b.is_card_invoice ? 'text-indigo-700 font-bold' : ''}">${b.creditor}</td>
+            <td class="p-3">${creditorContent}</td>
             <td class="p-3"><span class="px-2 py-1 bg-slate-100 text-xs font-bold rounded">${b.entity}</span></td>
             <td class="p-3">${d}/${m}/${y}</td>
             <td class="p-3 font-bold">${formatCurrency(b.installment_amount)}</td>
-            <td class="p-3 text-center space-x-2">
-              ${payButtonAction}
-              ${!b.is_card_invoice ? `<button onclick="deleteBill(${b.id})" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded"><i class="fa-solid fa-trash-can"></i></button>` : ''}
-            </td>
+            <td class="p-3 text-center">${actionsContent}</td>
           `;
           tbody.appendChild(tr);
         });
