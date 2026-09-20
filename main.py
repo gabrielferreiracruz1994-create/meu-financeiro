@@ -1,14 +1,13 @@
 import os
-from typing import Optional, List
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
+from sqlalchemy.orm import sessionmaker, Session
 
-# Pega o link do banco do Supabase via variável de ambiente
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
 
 if DATABASE_URL.startswith("postgres://"):
@@ -18,18 +17,16 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# MODELO DA TABELA DE CARTÕES
 class CardModel(Base):
     __tablename__ = "cards"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)            # Ex: Nubank, Itaú
-    entity = Column(String, nullable=False)          # Pessoal, Esposa, Empresa
+    name = Column(String, nullable=False)            # Ex: Inter, Nubank
+    entity = Column(String, nullable=False)          # Gabriel, Jéssica, Empresas
     total_limit = Column(Float, nullable=False)      # Limite Total
     closing_day = Column(Integer, nullable=False)    # Dia de fechamento
     due_day = Column(Integer, nullable=False)        # Dia de vencimento
 
-# MODELO DA TABELA DE DÍVIDAS / PARCELAS
 class BillModel(Base):
     __tablename__ = "bills"
 
@@ -45,9 +42,8 @@ class BillModel(Base):
     is_paid = Column(Boolean, default=False)
     is_recurrent = Column(Boolean, default=False)
     created_by_user = Column(String, nullable=False)
-    card_id = Column(Integer, ForeignKey("cards.id"), nullable=True) # Vínculo com o Cartão
+    card_id = Column(Integer, ForeignKey("cards.id"), nullable=True)
 
-# Cria as tabelas automaticamente no Supabase
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -59,7 +55,6 @@ def get_db():
     finally:
         db.close()
 
-# SCHEMAS PYDANTIC
 class CardCreate(BaseModel):
     name: str
     entity: str
@@ -79,7 +74,10 @@ class BillCreate(BaseModel):
     created_by_user: str
     card_id: Optional[int] = None
 
-# ROTAS DA API DE CARTÕES
+class BillUpdateStatus(BaseModel):
+    is_paid: bool
+
+# ROTAS CARTÕES
 @app.get("/api/cards")
 def get_cards(db: Session = Depends(get_db)):
     return db.query(CardModel).all()
@@ -101,7 +99,7 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
         return {"message": "Cartão excluído com sucesso"}
     raise HTTPException(status_code=404, detail="Cartão não encontrado")
 
-# ROTAS DA API DE DÍVIDAS
+# ROTAS DÍVIDAS
 @app.get("/api/bills")
 def get_bills(db: Session = Depends(get_db)):
     return db.query(BillModel).all()
@@ -114,6 +112,15 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
     db.refresh(db_bill)
     return db_bill
 
+@app.put("/api/bills/{bill_id}/status")
+def update_bill_status(bill_id: int, status_data: BillUpdateStatus, db: Session = Depends(get_db)):
+    bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
+    if bill:
+        bill.is_paid = status_data.is_paid
+        db.commit()
+        return {"message": "Status atualizado"}
+    raise HTTPException(status_code=404, detail="Dívida não encontrada")
+
 @app.delete("/api/bills/{bill_id}")
 def delete_bill(bill_id: int, db: Session = Depends(get_db)):
     bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
@@ -123,7 +130,6 @@ def delete_bill(bill_id: int, db: Session = Depends(get_db)):
         return {"message": "Excluído com sucesso"}
     raise HTTPException(status_code=404, detail="Não encontrado")
 
-# MANIFEST & STATIC FILES
 @app.get("/manifest.json")
 def get_manifest():
     if os.path.exists("manifest.json"):
