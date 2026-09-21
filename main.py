@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+import sys
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,12 +9,23 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
+# Localização de recursos estáticos no PyInstaller (.exe) e em desenvolvimento
+def get_resource_path(relative_path: str) -> str:
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+# Configuração do Banco de Dados SQLite Local
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./financeiro.db")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -51,6 +63,17 @@ class BillModel(Base):
     card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), nullable=True)
 
 Base.metadata.create_all(bind=engine)
+
+# Inserção de perfis iniciais se a tabela estiver vazia
+db_init = SessionLocal()
+if db_init.query(ProfileModel).count() == 0:
+    db_init.add_all([
+        ProfileModel(name="Gabriel"),
+        ProfileModel(name="Jéssica"),
+        ProfileModel(name="Empresas")
+    ])
+    db_init.commit()
+db_init.close()
 
 app = FastAPI()
 
@@ -174,6 +197,13 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
     db.refresh(db_bill)
     return db_bill
 
+@app.post("/api/bills/batch")
+def create_bills_batch(bills_list: List[BillCreate], db: Session = Depends(get_db)):
+    db_objs = [BillModel(**b.dict()) for b in bills_list]
+    db.add_all(db_objs)
+    db.commit()
+    return {"message": f"{len(db_objs)} lançamentos criados com sucesso"}
+
 @app.put("/api/bills/{bill_id}")
 def update_bill(bill_id: int, bill_data: BillUpdate, db: Session = Depends(get_db)):
     bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
@@ -204,17 +234,22 @@ def delete_bill(bill_id: int, db: Session = Depends(get_db)):
         return {"message": "Excluído com sucesso"}
     raise HTTPException(status_code=404, detail="Não encontrado")
 
+# MANIFESTO E INTERFACE
 @app.get("/manifest.json")
 def get_manifest():
-    if os.path.exists("manifest.json"):
-        return FileResponse("manifest.json")
+    manifest_path = get_resource_path("manifest.json")
+    if os.path.exists(manifest_path):
+        return FileResponse(manifest_path)
     raise HTTPException(status_code=404, detail="Manifest não encontrado")
 
-if os.path.exists("templates"):
-    app.mount("/static", StaticFiles(directory="templates"), name="static")
+templates_dir = get_resource_path("templates")
+index_html_path = os.path.join(templates_dir, "index.html")
+
+if os.path.exists(templates_dir):
+    app.mount("/static", StaticFiles(directory=templates_dir), name="static")
 
 @app.get("/")
 def read_root():
-    if os.path.exists("templates/index.html"):
-        return FileResponse("templates/index.html")
+    if os.path.exists(index_html_path):
+        return FileResponse(index_html_path)
     return {"message": "Servidor funcionando!"}
