@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
-    /* Estilização para garantir visibilidade do texto nas opções suspensas no Windows/WebView2 */
     select option {
       background-color: #1e293b !important;
       color: #f8fafc !important;
@@ -31,7 +30,7 @@
         </div>
         <div>
           <h1 class="text-xl font-bold leading-none">Controle Financeiro</h1>
-          <span class="text-xs text-slate-400">Sistema Offline & Dados Locais</span>
+          <span class="text-xs text-slate-400">Sincronizado na Nuvem (Supabase)</span>
         </div>
       </div>
 
@@ -55,7 +54,7 @@
   <!-- PAINEL PRINCIPAL -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
 
-    <!-- SEÇÃO DOS CARTÕES DE CRÉDITO -->
+    <!-- CARTÕES DE CRÉDITO -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="font-bold text-slate-800 flex items-center space-x-2">
@@ -71,17 +70,22 @@
       <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
     </div>
 
-    <!-- FILTROS -->
+    <!-- FILTROS COM PASSO RÁPIDO DE MÊS -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
         <div>
           <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Mês de Referência</label>
-          <input type="month" id="monthFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <div class="flex items-center space-x-1">
+            <button onclick="changeMonth(-1)" title="Mês Anterior" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-lg border border-gray-300 text-sm"><i class="fa-solid fa-chevron-left"></i></button>
+            <input type="month" id="monthFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <button onclick="changeMonth(1)" title="Próximo Mês" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-lg border border-gray-300 text-sm"><i class="fa-solid fa-chevron-right"></i></button>
+            <button onclick="resetToCurrentMonth()" title="Mês Atual" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2.5 py-2 rounded-lg border border-emerald-200 text-xs ml-1">Hoje</button>
+          </div>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Perfil / Titular</label>
-          <select id="profileFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"></select>
+          <select id="profileFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none h-[42px] mt-0.5"></select>
         </div>
       </div>
 
@@ -91,7 +95,7 @@
       </button>
     </div>
 
-    <!-- CARDS DE RESUMO -->
+    <!-- RESUMO -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex items-center justify-between">
         <div>
@@ -150,7 +154,7 @@
     </div>
   </main>
 
-  <!-- MODAL GERENCIAR PERFIS / PESSOAS -->
+  <!-- MODAL GERENCIAR PERFIS -->
   <div id="profilesModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
       <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
@@ -168,6 +172,41 @@
 
         <div class="pt-2 flex justify-end">
           <button type="button" onclick="closeProfilesModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ESCOPO DE EXCLUSÃO DE PARCELAS -->
+  <div id="deleteScopeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
+      <div class="bg-rose-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Excluir Lançamento Parcelado</h3>
+        <button onclick="closeDeleteScopeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-gray-700 font-medium">Esta conta faz parte de um parcelamento. Como deseja aplicar a exclusão?</p>
+
+        <div class="space-y-2">
+          <button onclick="confirmDeleteScoped('THIS')" class="w-full text-left p-3 border rounded-lg hover:bg-rose-50 hover:border-rose-300 transition">
+            <span class="block font-bold text-sm text-rose-900">1. Somente esta parcela</span>
+            <span class="block text-xs text-gray-500">Exclui apenas o registro do mês selecionado.</span>
+          </button>
+
+          <button onclick="confirmDeleteScoped('THIS_AND_FUTURE')" class="w-full text-left p-3 border rounded-lg hover:bg-rose-50 hover:border-rose-300 transition">
+            <span class="block font-bold text-sm text-rose-900">2. Esta e as próximas parcelas</span>
+            <span class="block text-xs text-gray-500">Exclui esta parcela e todas as futuras deste parcelamento.</span>
+          </button>
+
+          <button onclick="confirmDeleteScoped('ALL')" class="w-full text-left p-3 border rounded-lg hover:bg-rose-50 hover:border-rose-300 transition">
+            <span class="block font-bold text-sm text-rose-900">3. Todas as parcelas do parcelamento</span>
+            <span class="block text-xs text-gray-500">Remove o parcelamento por completo desde a 1ª parcela.</span>
+          </button>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button type="button" onclick="closeDeleteScopeModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold">Cancelar</button>
         </div>
       </div>
     </div>
@@ -294,6 +333,15 @@
           </div>
         </div>
 
+        <div id="editScopeContainer" class="hidden bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+          <label class="block text-xs font-bold text-indigo-900 uppercase mb-1">Aplicar Edição Para:</label>
+          <select id="editScope" class="w-full border rounded-lg p-2 text-sm bg-white">
+            <option value="THIS">Apenas esta parcela</option>
+            <option value="THIS_AND_FUTURE">Esta e as próximas parcelas</option>
+            <option value="ALL">Todas as parcelas do parcelamento</option>
+          </select>
+        </div>
+
         <div id="recurrentContainer" class="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center space-x-3">
           <input type="checkbox" id="isRecurrent" class="w-4 h-4 text-emerald-600 rounded">
           <label for="isRecurrent" class="text-xs font-bold text-amber-900 cursor-pointer">Dívida Recorrente (Conta Fixa Ex: Luz, Água)</label>
@@ -317,17 +365,35 @@
     let cards = [];
     let profiles = [];
     let currentInvoiceItems = [];
+    let pendingDeleteBillId = null;
 
     document.addEventListener('DOMContentLoaded', () => {
+      resetToCurrentMonth();
+      document.getElementById('monthFilter').addEventListener('change', render);
+      document.getElementById('profileFilter').addEventListener('change', render);
+      loadAllData();
+    });
+
+    function changeMonth(offset) {
+      const input = document.getElementById('monthFilter');
+      if (!input.value) return;
+
+      let [year, month] = input.value.split('-').map(Number);
+      let date = new Date(year, month - 1 + offset, 1);
+      
+      let newYear = date.getFullYear();
+      let newMonth = String(date.getMonth() + 1).padStart(2, '0');
+      
+      input.value = `${newYear}-${newMonth}`;
+      render();
+    }
+
+    function resetToCurrentMonth() {
       const today = new Date();
       document.getElementById('monthFilter').value = today.toISOString().slice(0, 7);
       document.getElementById('firstDueDate').value = today.toISOString().slice(0, 10);
-
-      document.getElementById('monthFilter').addEventListener('change', render);
-      document.getElementById('profileFilter').addEventListener('change', render);
-
-      loadAllData();
-    });
+      render();
+    }
 
     async function loadAllData() {
       try {
@@ -476,6 +542,12 @@
           document.getElementById('cardSelectContainer').classList.add('hidden');
           document.getElementById('installmentsCountContainer').classList.add('hidden');
           document.getElementById('recurrentContainer').classList.add('hidden');
+
+          if (bill.group_id) {
+            document.getElementById('editScopeContainer').classList.remove('hidden');
+          } else {
+            document.getElementById('editScopeContainer').classList.add('hidden');
+          }
         }
       } else {
         document.getElementById('billModalTitle').innerText = "Nova Dívida / Compra";
@@ -485,6 +557,7 @@
         document.getElementById('cardSelectContainer').classList.remove('hidden');
         document.getElementById('installmentsCountContainer').classList.remove('hidden');
         document.getElementById('recurrentContainer').classList.remove('hidden');
+        document.getElementById('editScopeContainer').classList.add('hidden');
       }
       document.getElementById('billModal').classList.remove('hidden');
     }
@@ -510,7 +583,7 @@
           <td class="p-2.5">${item.installment_number}/${item.total_installments}</td>
           <td class="p-2.5 font-bold">${formatCurrency(item.installment_amount)}</td>
           <td class="p-2.5 text-center">
-            <button onclick="deleteSingleInvoiceItem(${item.id})" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="deleteBill(${item.id})" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-trash-can"></i></button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -523,18 +596,10 @@
       document.getElementById('invoiceDetailsModal').classList.add('hidden');
     }
 
-    async function deleteSingleInvoiceItem(id) {
-      if (confirm('Excluir este item da fatura?')) {
-        await fetch(`/api/bills/${id}`, { method: 'DELETE' });
-        closeInvoiceModal();
-        loadAllData();
-      }
-    }
-
     async function deleteEntireInvoice() {
       if (confirm('Excluir TODAS as compras desta fatura do mês?')) {
         for (let item of currentInvoiceItems) {
-          await fetch(`/api/bills/${item.id}`, { method: 'DELETE' });
+          await fetch(`/api/bills/${item.id}/scoped?scope=THIS`, { method: 'DELETE' });
         }
         closeInvoiceModal();
         loadAllData();
@@ -616,14 +681,16 @@
         const dueDateVal = document.getElementById('firstDueDate').value;
 
         if (editId) {
+          const scopeVal = document.getElementById('editScope').value || 'THIS';
           const payload = {
             creditor: creditor,
             entity: entity,
             installment_amount: installmentVal,
-            due_date: dueDateVal
+            due_date: dueDateVal,
+            scope: scopeVal
           };
 
-          await fetch(`/api/bills/${editId}`, {
+          await fetch(`/api/bills/${editId}/scoped`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -696,6 +763,37 @@
       }
     }
 
+    function deleteBill(id) {
+      const bill = bills.find(b => b.id === id);
+      if (!bill) return;
+
+      if (bill.group_id) {
+        pendingDeleteBillId = id;
+        document.getElementById('deleteScopeModal').classList.remove('hidden');
+      } else {
+        if (confirm('Deseja excluir esta conta permanentemente?')) {
+          confirmDeleteScoped('THIS', id);
+        }
+      }
+    }
+
+    function closeDeleteScopeModal() {
+      pendingDeleteBillId = null;
+      document.getElementById('deleteScopeModal').classList.add('hidden');
+    }
+
+    async function confirmDeleteScoped(scope, targetId = null) {
+      const idToDelete = targetId || pendingDeleteBillId;
+      if (!idToDelete) return;
+
+      await fetch(`/api/bills/${idToDelete}/scoped?scope=${scope}`, { method: 'DELETE' });
+      closeDeleteScopeModal();
+      if (!document.getElementById('invoiceDetailsModal').classList.contains('hidden')) {
+        closeInvoiceModal();
+      }
+      loadAllData();
+    }
+
     async function toggleBillStatus(id, currentStatus) {
       await fetch(`/api/bills/${id}/status`, {
         method: 'PUT',
@@ -703,13 +801,6 @@
         body: JSON.stringify({ is_paid: !currentStatus })
       });
       loadAllData();
-    }
-
-    async function deleteBill(id) {
-      if (confirm('Deseja excluir esta conta permanentemente?')) {
-        await fetch(`/api/bills/${id}`, { method: 'DELETE' });
-        loadAllData();
-      }
     }
 
     function formatCurrency(val) {
@@ -840,7 +931,8 @@
 
             actionsContent = payButtonAction;
           } else {
-            creditorContent = `<span class="font-semibold">${b.creditor}</span>`;
+            const installmentBadge = b.total_installments > 1 ? `<span class="ml-1 text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold">${b.installment_number}/${b.total_installments}</span>` : '';
+            creditorContent = `<span class="font-semibold">${b.creditor}</span>${installmentBadge}`;
 
             payButtonAction = `
               <button onclick="toggleBillStatus(${b.id}, ${b.is_paid})" class="px-2.5 py-1 text-xs font-bold rounded transition ${b.is_paid ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
