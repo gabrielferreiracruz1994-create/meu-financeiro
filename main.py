@@ -1,5 +1,6 @@
 import os
 import sys
+import uuid
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
@@ -9,23 +10,12 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# Localização de recursos estáticos no PyInstaller (.exe) e em desenvolvimento
-def get_resource_path(relative_path: str) -> str:
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
-
-# Configuração do Banco de Dados SQLite Local
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./financeiro.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://usuario:senha@host:5432/postgres")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-else:
-    engine = create_engine(DATABASE_URL)
-
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -64,17 +54,6 @@ class BillModel(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# Inserção de perfis iniciais se a tabela estiver vazia
-db_init = SessionLocal()
-if db_init.query(ProfileModel).count() == 0:
-    db_init.add_all([
-        ProfileModel(name="Gabriel"),
-        ProfileModel(name="Jéssica"),
-        ProfileModel(name="Empresas")
-    ])
-    db_init.commit()
-db_init.close()
-
 app = FastAPI()
 
 def get_db():
@@ -102,6 +81,7 @@ class CardUpdate(BaseModel):
     due_day: int
 
 class BillCreate(BaseModel):
+    group_id: Optional[str] = None
     creditor: str
     entity: str
     total_amount: float
@@ -113,14 +93,12 @@ class BillCreate(BaseModel):
     created_by_user: str
     card_id: Optional[int] = None
 
-class BillUpdate(BaseModel):
+class BillUpdateScope(BaseModel):
     creditor: str
     entity: str
     installment_amount: float
     due_date: str
-
-class BillStatusUpdate(BaseModel):
-    is_paid: bool
+    scope: str # 'THIS', 'THIS_AND_FUTURE', 'ALL'
 
 # ROTAS DE PERFIS
 @app.get("/api/profiles")
@@ -189,67 +167,89 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
 def get_bills(db: Session = Depends(get_db)):
     return db.query(BillModel).all()
 
-@app.post("/api/bills")
-def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
-    db_bill = BillModel(**bill.dict())
-    db.add(db_bill)
-    db.commit()
-    db.refresh(db_bill)
-    return db_bill
-
 @app.post("/api/bills/batch")
 def create_bills_batch(bills_list: List[BillCreate], db: Session = Depends(get_db)):
-    db_objs = [BillModel(**b.dict()) for b in bills_list]
+    group_uuid = str(uuid.uuid4()) if len(bills_list) > 1 else None
+    db_objs = []
+    for b in bills_list:
+        data = b.dict()
+        if len(bills_list) > 1:
+            data["group_id"] = group_uuid
+        db_objs.append(BillModel(**data))
+    
     db.add_all(db_objs)
     db.commit()
     return {"message": f"{len(db_objs)} lançamentos criados com sucesso"}
 
-@app.put("/api/bills/{bill_id}")
-def update_bill(bill_id: int, bill_data: BillUpdate, db: Session = Depends(get_db)):
-    bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
-    if bill:
-        bill.creditor = bill_data.creditor
-        bill.entity = bill_data.entity
-        bill.installment_amount = bill_data.installment_amount
-        bill.due_date = bill_data.due_date
-        db.commit()
-        return {"message": "Lançamento atualizado"}
-    raise HTTPException(status_code=404, detail="Dívida não encontrada")
+@app.put("/api/bills/{bill_id}/scoped")
+def update_bill_scoped(bill_id: int, data: BillUpdateScope, db: Session = Depends(get_db)):
+    target = db.query(BillModel).filter(BillModel.id == bill_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Dívida não encontrada")
+
+    if not target.group_id or data.scope == 'THIS':
+        target.creditor = data.creditor
+        target.entity = data.entity
+        target.installment_amount = data.installment_amount
+        target.due_date = data.due_date
+    elif data.scope == 'ALL':
+        related = db.query(BillModel).filter(BillModel.group_id == target.group_id).all()
+        for b in related:
+            b.creditor = data.creditor
+            b.entity = data.entity
+            b.installment_amount = data.installment_amount
+    elif data.scope == 'THIS_AND_FUTURE':
+        related = db.query(BillModel).filter(
+            BillModel.group_id == target.group_id,
+            BillModel.installment_number >= target.installment_number
+        ).all()
+        for b in related:
+            b.creditor = data.creditor
+            b.entity = data.entity
+            b.installment_amount = data.installment_amount
+
+    db.commit()
+    return {"message": "Atualização concluída com sucesso"}
+
+@app.delete("/api/bills/{bill_id}/scoped")
+def delete_bill_scoped(bill_id: int, scope: str = 'THIS', db: Session = Depends(get_db)):
+    target = db.query(BillModel).filter(BillModel.id == bill_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Dívida não encontrada")
+
+    if not target.group_id or scope == 'THIS':
+        db.delete(target)
+    elif scope == 'ALL':
+        db.query(BillModel).filter(BillModel.group_id == target.group_id).delete()
+    elif scope == 'THIS_AND_FUTURE':
+        db.query(BillModel).filter(
+            BillModel.group_id == target.group_id,
+            BillModel.installment_number >= target.installment_number
+        ).delete()
+
+    db.commit()
+    return {"message": "Exclusão concluída com sucesso"}
 
 @app.put("/api/bills/{bill_id}/status")
-def update_bill_status(bill_id: int, status_data: BillStatusUpdate, db: Session = Depends(get_db)):
+def update_bill_status(bill_id: int, status_data: dict, db: Session = Depends(get_db)):
     bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
     if bill:
-        bill.is_paid = status_data.is_paid
+        bill.is_paid = status_data.get("is_paid", False)
         db.commit()
         return {"message": "Status atualizado"}
     raise HTTPException(status_code=404, detail="Dívida não encontrada")
 
-@app.delete("/api/bills/{bill_id}")
-def delete_bill(bill_id: int, db: Session = Depends(get_db)):
-    bill = db.query(BillModel).filter(BillModel.id == bill_id).first()
-    if bill:
-        db.delete(bill)
-        db.commit()
-        return {"message": "Excluído com sucesso"}
-    raise HTTPException(status_code=404, detail="Não encontrado")
-
-# MANIFESTO E INTERFACE
 @app.get("/manifest.json")
 def get_manifest():
-    manifest_path = get_resource_path("manifest.json")
-    if os.path.exists(manifest_path):
-        return FileResponse(manifest_path)
+    if os.path.exists("manifest.json"):
+        return FileResponse("manifest.json")
     raise HTTPException(status_code=404, detail="Manifest não encontrado")
 
-templates_dir = get_resource_path("templates")
-index_html_path = os.path.join(templates_dir, "index.html")
-
-if os.path.exists(templates_dir):
-    app.mount("/static", StaticFiles(directory=templates_dir), name="static")
+if os.path.exists("templates"):
+    app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 @app.get("/")
 def read_root():
-    if os.path.exists(index_html_path):
-        return FileResponse(index_html_path)
+    if os.path.exists("templates/index.html"):
+        return FileResponse("templates/index.html")
     return {"message": "Servidor funcionando!"}
