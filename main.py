@@ -54,6 +54,38 @@ class BillModel(Base):
 
 Base.metadata.create_all(bind=engine)
 
+def auto_fix_legacy_groups(db: Session):
+    """ Vincula parcelas antigas criadas sem group_id que possuem mesma descrição, titular e total de parcelas """
+    legacy_bills = db.query(BillModel).filter(
+        BillModel.group_id == None,
+        BillModel.total_installments > 1
+    ).all()
+
+    if not legacy_bills:
+        return
+
+    grouped_dict = {}
+    for bill in legacy_bills:
+        key = (bill.creditor, bill.entity, bill.total_installments, bill.card_id)
+        if key not in grouped_dict:
+            grouped_dict[key] = []
+        grouped_dict[key].append(bill)
+
+    for key, items in grouped_dict.items():
+        if len(items) > 1:
+            new_group_id = str(uuid.uuid4())
+            for item in items:
+                item.group_id = new_group_id
+    
+    db.commit()
+
+# Agrupa lançamentos antigos ao iniciar a aplicação
+db_fix = SessionLocal()
+try:
+    auto_fix_legacy_groups(db_fix)
+finally:
+    db_fix.close()
+
 app = FastAPI()
 
 def get_db():
@@ -166,6 +198,11 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
 @app.get("/api/bills")
 def get_bills(db: Session = Depends(get_db)):
     return db.query(BillModel).all()
+
+@app.get("/api/bills/fix-groups")
+def trigger_fix_groups(db: Session = Depends(get_db)):
+    auto_fix_legacy_groups(db)
+    return {"message": "Agrupamento de contas antigas concluído com sucesso!"}
 
 @app.post("/api/bills/batch")
 def create_bills_batch(bills_list: List[BillCreate], db: Session = Depends(get_db)):
